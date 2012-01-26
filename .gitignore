@@ -1,0 +1,5 @@
+# ignore all objects and archives
+*.[oa]
+
+#ignore the current files
+DBFile.cc
