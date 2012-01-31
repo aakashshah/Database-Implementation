@@ -2,4 +2,4 @@
 *.[oa]
 
 #ignore the current files
-DBFile.cc
+*.out
