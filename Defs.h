@@ -1,16 +1,14 @@
 #ifndef DEFS_H
 #define DEFS_H
 
+#define TRUE 1
+#define FALSE 0
 
 #define MAX_ANDS 20
 #define MAX_ORS 20
 
 #define PAGE_SIZE 131072
 
-// Added by Aakash {
-#define TRUE 1
-#define FALSE 0
-//}
 
 enum Target {Left, Right, Literal};
 enum CompOperator {LessThan, GreaterThan, Equals};

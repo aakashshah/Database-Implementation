@@ -15,9 +15,7 @@ Record :: ~Record () {
 		delete [] bits;
 	}
 	bits = NULL;
-
 }
-
 
 int Record :: SuckNextRecord (Schema *mySchema, FILE *textFile) {
 

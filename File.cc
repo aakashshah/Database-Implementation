@@ -26,10 +26,6 @@ Page :: ~Page () {
 	delete myRecs;
 }
 
-int Page :: GetRecNum() {
-	return numRecs;
-}
-
 
 void Page :: EmptyItOut () {
 
@@ -46,10 +42,8 @@ void Page :: EmptyItOut () {
 }
 
 void Page :: GotoFirst() {
-	//move to the first record
 	myRecs->MoveToStart();
 }
-
 
 int Page :: GetFirst (Record *firstOne) {
 
@@ -194,7 +188,6 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 	read (myFilDes, bits, PAGE_SIZE);
 	putItHere->FromBinary (bits);
 	delete [] bits;
-	
 }
 
 
@@ -230,6 +223,7 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 	lseek (myFilDes, PAGE_SIZE * whichPage, SEEK_SET);
 	write (myFilDes, bits, PAGE_SIZE);
 	delete [] bits;
+
 #ifdef F_DEBUG
 	cerr << " File: curLength " << curLength << " whichPage " << whichPage << endl;
 #endif
@@ -291,15 +285,4 @@ int File :: Close () {
 	
 }
 
-int File :: Remove (char *fName) {
 
-	// remove the file from the disk
-	if (NULL == fName) {
-		return FALSE;
-	}
-
-	// remove returns 0 on success!
-	return (!remove (fName));
-
-	
-}

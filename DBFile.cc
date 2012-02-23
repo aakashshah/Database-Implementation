@@ -42,14 +42,17 @@ int DBFile::Create (char *f_path, fType f_type, void *startup) {
 	/* Also, f_type should be heap only (refer enum fType) */
 	if (NULL == f_path) {
 		cout << "Invalid file name";
+		return FALSE;
 	}
 
 	if (NULL != startup) {
 		cout << "Expected pointer startup to be NULL";
+		return FALSE;
 	}
 
 	if (heap != f_type) {
 		cout << "Expected f_type to be heap";
+		return FALSE;
 	}
 
 	/* Open the bin file and store the file descriptor */
@@ -58,6 +61,14 @@ int DBFile::Create (char *f_path, fType f_type, void *startup) {
 	/* We would want to create a new file and hence lengthOfFile should be 0 */
 	int lengthOfFile = 0;
 	dbFile->Open(lengthOfFile, f_path);
+
+	cout << "Created a file at " << f_path << endl;
+
+	// take care of the page pointer
+	if (NULL == curPage) {
+		curPage = new Page();
+		curPageNum = 0;
+	}
 
 	return TRUE;
 }
@@ -84,12 +95,9 @@ void DBFile::Load (Schema &f_schema, char *loadpath) {
 	int pageNumber;
 	
 	// check the number of pages inside the file
-	pagesInDBFile = dbFile->GetLength();
+	pagesInDBFile = (dbFile->GetLength() - 2);
 	
-	if (pagesInDBFile > 1) {
-		pageNumber = (pagesInDBFile - 1);
-	}
-	else {
+	if (pagesInDBFile < 0) {
 		pageNumber = 0;
 	}
 
@@ -151,7 +159,7 @@ void DBFile::MoveFirst () {
 	// move to the first record of the 1st page
 	curPageNum = 0;
 	dbFile->GetPage(curPage, curPageNum);
-	curPage->GotoFirst();
+	//curPage->GotoFirst();
 }
 
 int DBFile::Close () {
@@ -175,8 +183,10 @@ int DBFile::Close () {
 
 void DBFile::Add (Record &rec) {
 	// get the last page
-	int addToPageNum = (dbFile->GetLength() - 1);
+	int addToPageNum = (dbFile->GetLength() - 2);
 	Page pageBuffer, newPage;
+
+	pageBuffer.EmptyItOut();
 
 	// there should be atleast 1 page in the file,
 	// if not create one ( < 0 => no pages present!)
@@ -196,6 +206,7 @@ void DBFile::Add (Record &rec) {
 	// to that page
 	dbFile->GetPage(&pageBuffer, addToPageNum);
 	if (FALSE != pageBuffer.Append(&rec)) {
+		dbFile->AddPage(&pageBuffer, addToPageNum);
 		return;
 	}
 
@@ -208,12 +219,13 @@ void DBFile::Add (Record &rec) {
 	// if it does not have space, create a new page
 	// and add the record there
 	addToPageNum++;
+	newPage.EmptyItOut();
 	if (FALSE == newPage.Append(&rec)) {
 		cout << "New page, still cannot add record!" << endl;
 		exit(1);
 	}
 
-	// as no pages are present, add to page 0
+	// as current pages are full, add to new page
 	dbFile->AddPage(&newPage, addToPageNum);
 }
 

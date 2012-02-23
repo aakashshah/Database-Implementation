@@ -23,9 +23,6 @@ public:
 	Page ();
 	virtual ~Page ();
 
-	// get the number of records in the page
-	int GetRecNum();
-
 	// this takes a page and writes its binary representation to bits
 	void ToBinary (char *bits);
 
@@ -33,8 +30,8 @@ public:
 	// records from it
 	void FromBinary (char *bits);
 
-	// move to the first page's first record
-	void GotoFirst ();
+	// moves to the first record on a page
+	void GotoFirst();
 
 	// the deletes the first record from a page and returns it; returns
 	// a zero if there were no records on the page
@@ -82,9 +79,6 @@ public:
 
 	// closes the file and returns the file length (in number of pages)
 	int Close ();
-
-	// delete the file from the disk
-	int Remove (char *fName);
 
 };
 
