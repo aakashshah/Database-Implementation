@@ -1,9 +1,8 @@
 #include "Schema.h"
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <iostream>
-
+#include <stdlib.h>
 int Schema :: Find (char *attName) {
 
 	for (int i = 0; i < numAtts; i++) {

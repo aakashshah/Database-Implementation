@@ -17,6 +17,7 @@ enum Type {Int, Double, String};
 
 unsigned int Random_Generate();
 
+#define MAX_FILENAME_LEN 128
 
 #endif
 

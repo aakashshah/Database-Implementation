@@ -50,6 +50,7 @@ class OrderMaker {
 
 public:
 	
+
 	// creates an empty OrdermMaker
 	OrderMaker();
 
@@ -59,6 +60,12 @@ public:
 
 	// print to the screen
 	void Print ();
+
+	// instead of printing on screen, dump data to a file
+	void DumpData(FILE *thisFile);
+
+	// the opposite of DumpData, this reads from file into local variable
+	void ReadData(FILE *thisFile);
 };
 
 class Record;
@@ -83,6 +90,9 @@ public:
 	// only if it is impossible to determine an acceptable ordering
 	// for the given comparison
 	int GetSortOrders (OrderMaker &left, OrderMaker &right);
+
+	bool GetSortOrders (OrderMaker &fileOrderMaker,
+		OrderMaker &queryOrderMaker, OrderMaker &literalOrderMaker);
 
 	// print the comparison structure to the screen
 	void Print ();

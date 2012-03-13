@@ -1,12 +1,12 @@
 #include "File.h"
 #include "TwoWayList.cc"
 
+#include<stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
-#include <stdlib.h>
 
 
 
@@ -41,9 +41,6 @@ void Page :: EmptyItOut () {
 	numRecs = 0;
 }
 
-void Page :: GotoFirst() {
-	myRecs->MoveToStart();
-}
 
 int Page :: GetFirst (Record *firstOne) {
 
@@ -112,6 +109,7 @@ void Page :: FromBinary (char *bits) {
 
 	// first read the number of records on the page
 	numRecs = ((int *) bits)[0];
+	//subi //cerr << " numRecs in page " << numRecs << endl;
 
 	// sanity check
 	if (numRecs > 1000000 || numRecs < 0) {
@@ -169,6 +167,7 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 
 	// this is because the first page has no data
 	whichPage++;
+	//subi// cerr << "get_pg " << whichPage << " file_sz " << curLength << endl;
 
 	if (whichPage >= curLength) {
 		cerr << "whichPage " << whichPage << " length " << curLength << endl;
@@ -188,6 +187,7 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 	read (myFilDes, bits, PAGE_SIZE);
 	putItHere->FromBinary (bits);
 	delete [] bits;
+	
 }
 
 
@@ -223,7 +223,6 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 	lseek (myFilDes, PAGE_SIZE * whichPage, SEEK_SET);
 	write (myFilDes, bits, PAGE_SIZE);
 	delete [] bits;
-
 #ifdef F_DEBUG
 	cerr << " File: curLength " << curLength << " whichPage " << whichPage << endl;
 #endif
@@ -285,4 +284,35 @@ int File :: Close () {
 	
 }
 
+// gives the first unused page number for this file
+int File :: FirstUnusedPageNum() {
+	int pageNum;
 
+        pageNum = curLength - 1;
+        if (pageNum < 0) {
+                return 0;
+        }
+
+        return pageNum;
+}
+
+// gives the last used page number for this file
+int File :: LastUsedPageNum() {
+	int pageNum;
+
+        pageNum = curLength - 2;
+        if (pageNum < 0) {
+                return 0;
+        }
+
+        return pageNum;
+}
+
+// tells if the file is empty or not!
+bool File :: IsFileEmpty() {
+	if (0 == curLength) {
+		return true;
+	}
+
+	return false;
+}

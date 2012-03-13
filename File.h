@@ -30,9 +30,6 @@ public:
 	// records from it
 	void FromBinary (char *bits);
 
-	// moves to the first record on a page
-	void GotoFirst();
-
 	// the deletes the first record from a page and returns it; returns
 	// a zero if there were no records on the page
 	int GetFirst (Record *firstOne);
@@ -52,7 +49,7 @@ class File {
 private:
 
 	int myFilDes;
-	off_t curLength; 
+	off_t curLength; //this was private in Chris's version
 
 public:
 
@@ -79,7 +76,14 @@ public:
 
 	// closes the file and returns the file length (in number of pages)
 	int Close ();
+	
+	// gives the first unused page number for this file
+	int FirstUnusedPageNum();
 
+	// gives the last used page number for this file
+	int LastUsedPageNum();
+
+	bool IsFileEmpty();
 };
 
 

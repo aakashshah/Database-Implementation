@@ -56,31 +56,6 @@ Record* increaseSize(Record *ptr, int oldSize, int newSize) {
 	return newPtr;	
 }
 
-// gives out the first unused page number for a file
-int getFreePageNumber(File &fileObj) {
-	int pageNum;
-
-	pageNum = fileObj.GetLength() - 1;
-	if (pageNum < 0) {
-		return 0;
-	}
-
-	return pageNum;
-}
-
-// gives out the last used page number for a file
-int getLastPageNumber(File &fileObj) {
-	int pageNum;
-
-	pageNum = fileObj.GetLength() - 2;
-	if (pageNum < 0) {
-		return 0;
-	}
-
-	return pageNum;
-}
-
-
 // this is the thread which will sort all the records and write them
 // into the out pipe
 void *sorter (void *args) {
@@ -122,6 +97,9 @@ void *sorter (void *args) {
 			<< "Using default run length: [" << DEFAULT_RUN_LEN <<"]" << endl;
 		runlen = DEFAULT_RUN_LEN;
 	}
+
+	// stores the page number where the run ends
+	vector<int> runPageEnd;
 	
 	//////////////////////////////// phase 1 ////////////////////////////////////
 	// accept all pages until the runlength
@@ -156,20 +134,32 @@ void *sorter (void *args) {
 				qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
 
 				// dump everything into a file
+				int pagesDumped = 0;
 				for (int i = 0; i < totalRecs; i++) {
 					// if you are not able to append (probably the page is full)
 					if (0 == singlePage.Append(&(recBuffer[i]))) {
 						// this gives the page number which is free
-						int pageNum = getFreePageNumber(outFile);
+						int pageNum = outFile.FirstUnusedPageNum();
 						//cout << "******* Added Pagenum: " << pageNum << endl;
 						//cout << "******* Added Recs: " << i << endl;
 						outFile.AddPage(&singlePage, pageNum);
+						pagesDumped++;
 						singlePage.EmptyItOut();
 						if (0 == singlePage.Append(&(recBuffer[i]))) {
 							cout << "Error " << __LINE__ << endl;
 						}
 					}
 				}
+
+				int pageNum = outFile.FirstUnusedPageNum();
+				outFile.AddPage(&singlePage, pageNum);
+				pagesDumped++;
+				singlePage.EmptyItOut();
+
+				if (totalRuns > 0) {
+					pagesDumped += runPageEnd[totalRuns-1];
+				}
+				runPageEnd.push_back(pagesDumped);
 
 				// the record which was removed from the pipe and not added
 				// to a page, now becomes the first record of the next run
@@ -187,12 +177,6 @@ void *sorter (void *args) {
 		// it would not fit in the page, it will fit in the next page)!
 		totalRecs++;
 		if (totalRecs == RECORD_SIZE) { // you have run out of memory
-
-			/*
-			for (int i = 0; i < totalRecs; i++) {
-				recBuffer[i].Print(s);
-			}*/
-
 			tmp = increaseSize(recBuffer, RECORD_SIZE, (2 * RECORD_SIZE));
 			if (NULL == tmp) {
 				cout << __FILE__ << "(" <<__LINE__ << ")"
@@ -207,11 +191,6 @@ void *sorter (void *args) {
 			recBuffer = tmp;
 			tmp = NULL;
 			RECORD_SIZE *= 2;
-
-			/*
-			for (int i = 0; i < totalRecs; i++) {
-				recBuffer[i].Print(s);
-			}*/
 		}
 	}
 
@@ -222,13 +201,15 @@ void *sorter (void *args) {
 		qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
 
 		// dump everything into a file
+		int pagesDumped = 0;
 		for (int i = 0; i < totalRecs; i++) {
 			if (0 == singlePage.Append(&(recBuffer[i]))) {
 				// this gives the page number which is free
-				int pageNum = getFreePageNumber(outFile);
+				int pageNum = outFile.FirstUnusedPageNum();
 				//cout << "####### Added Pagenum: " << pageNum << endl;
 				//cout << "####### Added Recs: " << i << endl;
 				outFile.AddPage(&singlePage, pageNum);
+				pagesDumped++;
 				singlePage.EmptyItOut();
 				if (0 == singlePage.Append(&(recBuffer[i]))) {
 					cout << "Error " << __LINE__ << endl;
@@ -239,9 +220,15 @@ void *sorter (void *args) {
 		}
 
 		// insert the record if present into the file
-		int pageNum = getFreePageNumber(outFile);
+		int pageNum = outFile.FirstUnusedPageNum();
 		outFile.AddPage(&singlePage, pageNum);
+		pagesDumped++;
 		singlePage.EmptyItOut();
+		
+		if (totalRuns > 0) {
+			pagesDumped += runPageEnd[totalRuns-1];
+		}
+		runPageEnd.push_back(pagesDumped);
 		
 		totalRuns++;
 	}
@@ -293,9 +280,15 @@ void *sorter (void *args) {
 	// load atleast 1 page of each record
 	for (int i = 0; i < totalRuns; i++) {
 		//cout << "Reading page " << (i*runlen) << " for run " << i << endl;
-		outFile.GetPage(&pageBuffer[i], (i*runlen));
+		int getPageNum;
+		if (i == 0) {
+			getPageNum = 0;
+		} else {
+			getPageNum = runPageEnd[i-1];
+		}
+		outFile.GetPage(&pageBuffer[i], getPageNum);
 		// stores the pagenumber of each run, if -1 there are no more records in that run
-		runPageNum[i] = (i*runlen);
+		runPageNum[i] = getPageNum;
 	}
 
 	//insert 1 element from each run
@@ -337,14 +330,15 @@ void *sorter (void *args) {
 			// if the run is over, mark the index
 			//cout << "Page " << runPageNum[runIdx] << " got over!" <<  endl;
 			runPageNum[runIdx]++;
-			if (0 == (runPageNum[runIdx] % runlen)) {
+			//if (0 == (runPageNum[runIdx] % runlen)) {
+			if (runPageNum[runIdx] == runPageEnd[runIdx]) {
 				runPageNum[runIdx] = (-1);
 				continue;
 			}
 
 			// if the page ran out of records and the run
 			// is not over, get the next page
-			if (runPageNum[runIdx] > (getLastPageNumber(outFile))) {
+			if (runPageNum[runIdx] > (outFile.LastUsedPageNum())) {
 				// no more pages
 				continue;
 			}

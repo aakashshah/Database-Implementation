@@ -117,7 +117,57 @@ void OrderMaker :: Print () {
 	}
 }
 
+void OrderMaker :: DumpData(FILE *thisFile) {
+	
+	if (NULL == thisFile) {
+		cout << "Invalid file passed to OrderMaker!" << endl;
+		return;
+	}
 
+	fprintf(thisFile, "\n%d\n", numAtts);
+	for (int i = 0; i < numAtts; i++)
+	{
+		fprintf(thisFile, "%d\n", whichAtts[i]);
+		if (whichTypes[i] == Int)
+			fprintf(thisFile, "Int\n");
+		else if (whichTypes[i] == Double)
+			fprintf(thisFile, "Double\n");
+		else
+			fprintf(thisFile, "String\n");
+	}
+}
+
+void OrderMaker :: ReadData(FILE *thisFile) {
+	
+	if (NULL == thisFile) {
+		cout << "Invalid file passed to OrderMaker!" << endl;
+		return;
+	}
+
+	char line[32];
+
+	if (EOF == fscanf(thisFile, "\n%d\n", &numAtts)) {
+		return;
+	}
+
+	for (int i = 0; i < numAtts; i++)
+	{
+		if (EOF == fscanf(thisFile, "%d\n", &whichAtts[i])) {
+			return;
+		}
+
+		if (EOF == fscanf(thisFile, "%s\n", line)) {
+			return;
+		}
+
+		if (line[0] == 'I')
+			whichTypes[i] = Int;
+		else if (line[0] == 'D')
+			whichTypes[i] = Double;
+		else
+			whichTypes[i] = String;
+	}
+}
 
 int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 
@@ -141,12 +191,10 @@ int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 		}
 
 		// now verify that it operates over atts from both tables
-		/* Commented by Aakash
 		if (!((orList[i][0].operand1 == Left && orList[i][0].operand2 == Right) ||
 		      (orList[i][0].operand2 == Left && orList[i][0].operand1 == Right))) {
-			continue;		
+			//continue;		
 		}
-		*/
 
 		// since we are here, we have found a join attribute!!!
 		// so all we need to do is add the new comparison info into the
@@ -177,9 +225,57 @@ int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 	}
 	
 	return left.numAtts;
-
 }
 
+bool CNF :: GetSortOrders (OrderMaker &fileOrderMaker, OrderMaker &queryOrderMaker, OrderMaker &literalOrderMaker) {
+
+	bool usable = false;
+
+	// scan all fileOrderMaker attributes, compare then with
+	// the CNF ordermaker and see if they qualify for queryOrderMaker
+	for (int i = 0; i < fileOrderMaker.numAtts; i++) {
+
+		// scan the CNF ordermaker now
+		for (int j = 0; j < numAnds; j++) {
+			// if we don't have a disjunction of length one, then it
+			// can't be acceptable for use with a sort ordering
+			if (orLens[j] != 1) {
+				continue;
+			}
+
+			// made it this far, so first verify that it is an equality check
+			if (orList[j][0].op != Equals) {
+				continue;
+			}
+
+			// check if the CNF has the attribute present with a literal on
+			// the other side
+			if (((fileOrderMaker.whichAtts[i] == orList[j][0].whichAtt1)
+					&& (Literal == orList[j][0].operand2))
+				|| ((fileOrderMaker.whichAtts[i] == orList[j][0].whichAtt2)
+					&& (Literal == orList[j][0].operand1))) {
+
+				queryOrderMaker.numAtts++;
+				queryOrderMaker.whichAtts[i] = fileOrderMaker.whichAtts[i];
+				queryOrderMaker.whichTypes[i] = fileOrderMaker.whichTypes[i];
+
+				literalOrderMaker.numAtts++;
+				literalOrderMaker.whichAtts[i] = 0;
+				literalOrderMaker.whichTypes[i] = fileOrderMaker.whichTypes[i];
+
+				usable = true;
+
+				break;
+			}
+
+			// if you reach there then its an unsuccessful attribute,
+			// return from here
+			return usable;
+		}
+	}
+
+	return usable;
+}
 
 void CNF :: Print () {
 

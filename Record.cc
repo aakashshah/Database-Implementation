@@ -2,9 +2,8 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <iostream>
-
+#include<stdlib.h>
 
 Record :: Record () {
 	bits = NULL;
@@ -15,7 +14,9 @@ Record :: ~Record () {
 		delete [] bits;
 	}
 	bits = NULL;
+
 }
+
 
 int Record :: SuckNextRecord (Schema *mySchema, FILE *textFile) {
 
