@@ -24,7 +24,9 @@ class CompareRecsPQ {
 	// the idea is to tell if element 1 has LOWER priority than element2
 	bool operator()(pQ &element1, pQ &element2) {
 		// the smaller one gets higher priority
-		if ((-1) == compareRecs(element1.rec, element2.rec)) {
+		// in case it is a string, strcmp is used and hence
+		// comparision could be any -ve number including and other than -1 
+		if (compareRecs(element1.rec, element2.rec) < 0) {
 			return false;
 		}
 
