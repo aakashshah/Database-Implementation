@@ -6,7 +6,7 @@
 #include "File.h"
 #include "Record.h"
 
-#define DEFAULT_RUN_LEN 5
+#define DEFAULT_RUN_LEN 50
 #define DEFAULT_RECORD_SIZE 1024
 
 typedef struct sortArgs_s {

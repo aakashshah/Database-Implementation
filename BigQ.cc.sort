@@ -5,15 +5,10 @@
 #include <time.h>
 #include <vector>
 #include <queue>
-
-// passed for knowing the sort order
-OrderMaker *sortorder = NULL;
-
-// mutex to prevent parallel sorting
-pthread_mutex_t doSort = PTHREAD_MUTEX_INITIALIZER;
+#include <algorithm>
 
 // this function compares 2 records and returns saying which one is 
-int compareRecs(const void *rec1, const void *rec2) {
+int compareRecs(const void *rec1, const void *rec2, OrderMaker *sortorder) {
 
 	// if rec1 is smaller return -1, if equal return 0, else 1
 	ComparisonEngine cEng;
@@ -21,13 +16,6 @@ int compareRecs(const void *rec1, const void *rec2) {
 	Record *r2 = (Record *)rec2;
 
 	return cEng.Compare(r1, r2, sortorder);
-}
-
-int compare(Record *r1, Record *r2, OrderMaker *so) {
-
-	// if rec1 is smaller return -1, if equal return 0, else 1
-	ComparisonEngine cEng;
-	return cEng.Compare(r1, r2, so);
 }
 
 // this function is for record comparision for the priority queue
@@ -43,7 +31,29 @@ class CompareRecsPQ {
 		// the smaller one gets higher priority
 		// in case it is a string, strcmp is used and hence
 		// comparision could be any -ve number including and other than -1 
-		if (compare(element1.rec, element2.rec, sortorder) < 0) {
+		if (compareRecs(element1.rec, element2.rec, sortorder) < 0) {
+			return false;
+		}
+
+		return true;
+	}
+};
+
+// this function is for record comparision for sort()
+class CompareRecsSort {
+	private:
+	OrderMaker *sortorder;
+	public:
+	CompareRecsSort(OrderMaker *so) {
+		sortorder = so;
+		cout << "Set!" << endl;
+	}
+	// the idea is to tell if element 1 has LOWER priority than element2
+	bool operator()(const Record &element1, const Record &element2) const {
+		// the smaller one gets higher priority
+		// in case it is a string, strcmp is used and hence
+		// comparision could be any -ve number including and other than -1 
+		if (compareRecs(&element1, &element2, sortorder) < 0) {
 			return false;
 		}
 
@@ -81,7 +91,9 @@ void *sorter (void *args) {
 	sortArgs *useTheseArgs = (sortArgs *)args;
 	Pipe *in = useTheseArgs->in, *out = useTheseArgs->out;
 	
-	
+	// global variable to pass it to the comparision function
+	OrderMaker *sortorder = useTheseArgs->sortOrder;
+
 	int runlen = useTheseArgs->runlen;
 	int pagesUsedInARun = 0;
 	int pageSize = 0;
@@ -150,12 +162,8 @@ void *sorter (void *args) {
 				cout << "Sorting: runlen: " << runlen << endl;*/
 
 				// sort all records
-				pthread_mutex_lock(&doSort);
-				// global variable to pass it to the comparision function
-				sortorder = useTheseArgs->sortOrder;
-				qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
-				pthread_mutex_unlock(&doSort);
-				//sort(recBuffer, &recBuffer[totalRecs], CompareRecsSort(sortorder));
+				//qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
+				sort(&recBuffer[0], &recBuffer[totalRecs], CompareRecsSort(sortorder));
 
 				// dump everything into a file
 				int pagesDumped = 0;
@@ -222,11 +230,8 @@ void *sorter (void *args) {
 	// they were never written onto any page. write them now.
 	if (totalRecs) {
 		// sort all records
-		pthread_mutex_lock(&doSort);
-		// global variable to pass it to the comparision function
-		sortorder = useTheseArgs->sortOrder;
-		qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
-		pthread_mutex_unlock(&doSort);
+		//qsort(recBuffer, totalRecs, sizeof(Record), compareRecs);
+		sort(&recBuffer[0], &recBuffer[totalRecs], CompareRecsSort(sortorder));
 
 		// dump everything into a file
 		int pagesDumped = 0;

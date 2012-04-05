@@ -1,6 +1,7 @@
 #include "Pipe.h"
-#include <stdlib.h>
+
 #include <iostream> 
+#include <stdlib.h>
 
 Pipe :: Pipe (int bufferSize) {
 

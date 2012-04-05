@@ -1,13 +1,12 @@
 #include "File.h"
 #include "TwoWayList.cc"
 
-#include<stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
-
+#include <stdlib.h>
 
 
 Page :: Page () {

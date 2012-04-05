@@ -165,6 +165,8 @@ int Heap::Open (char *f_path) {
 		curPage = new Page();
 		curPageNum = 0;
 	}
+
+	return TRUE;
 }
 
 void Heap::MoveFirst () {
@@ -393,8 +395,10 @@ void Sorted :: Merge() {
 	ComparisonEngine cEng;
 	int compResult;
 
-	char tmpFileName[MAX_FILENAME_LEN] = "askiu3o3iurnmnsdf.tmp\0";
-	char tmpMetaFileName[MAX_FILENAME_LEN] = "askiu3o3iurnmnsdf.tmp.meta\0";
+	char tmpFileName[MAX_FILENAME_LEN];// = "askiu3o3iurnmnsdf.tmp\0";
+	sprintf(tmpFileName, "%u%u.tmp\0", (unsigned int)getpid(), (unsigned int)pthread_self());
+	char tmpMetaFileName[MAX_FILENAME_LEN];// = "askiu3o3iurnmnsdf.tmp.meta\0";
+	sprintf(tmpMetaFileName, "%s.meta\0", tmpFileName);
 
 	tmpFile.Create(tmpFileName, heap, NULL);
 
@@ -627,6 +631,8 @@ int Sorted :: Open (char *f_path) {
 
 	// switch the mode of file to reading
 	fileMode = reading;
+
+	return TRUE;
 }
 
 void Sorted :: MoveFirst () {
@@ -1009,7 +1015,7 @@ int DBFile::Open (char *f_path) {
 		// open meta file
 		FILE *metaFile = fopen(metaFileName, "r");
 		if (!metaFile) {
-			cout << "Failed to determine file type!" << endl;
+			cout << "Failed to determine file type for file " << f_path << endl;
 			return FALSE;
 		}
 
@@ -1038,7 +1044,12 @@ int DBFile::Open (char *f_path) {
 		return FALSE;
 	}
 
-	return dbFile->Open(f_path);
+	int fileOpened = dbFile->Open(f_path);
+	if (TRUE == fileOpened) {
+		dbFile->MoveFirst();
+	}
+
+	return fileOpened;
 }
 
 void DBFile::MoveFirst () {
