@@ -792,32 +792,19 @@ void* workerGroupBy (void *args) {
 	// the record that has been removed from the intermOutPipe
 	// is always distinct and hence pass it to the sum's in pipe
 	Pipe *sumInPipe = new Pipe(100);
-	Pipe *sumOutPipe = new Pipe(100);
 	Record sumRecBuffer;
 	
 	Sum aggr;
-	aggr.Run(*sumInPipe, *sumOutPipe, *(wArgs->func));
+	aggr.Run(*sumInPipe, *(wArgs->out), *(wArgs->func));
 	sumRecBuffer.Copy(prev);
 
-	/*
-	Attribute IA = {"int", Int};
-	Attribute SA = {"string", String};
-	Attribute DA = {"double", Double};
-	Attribute joinatt[] = { IA, SA, SA, IA, SA, DA, SA, IA, IA, IA,	DA, SA };
-	Schema sch ("jsch", 12, joinatt);
-	//sumRecBuffer.Print(&sch);
-	*/
-
 	sumInPipe->Insert(&sumRecBuffer);
-
-        // remove all records from the intermediate pipe
+        
+	// remove all records from the intermediate pipe
         // compare with prev, if same do not insert into
         // the out pipe
-	int cnt = 1;
-	int grp = 0;
 	ComparisonEngine cEng;
         while (intermOutPipe.Remove(curr)) {
-		//curr->Print(&sch);
                 if (0 == cEng.Compare(prev, curr, wArgs->order)) {
 			// apply aggregate function if the records are similar
 			sumInPipe->Insert(curr);
@@ -828,20 +815,9 @@ void* workerGroupBy (void *args) {
 		// group now and hence get the aggregate record from the out pipe
 		sumInPipe->ShutDown();
 		aggr.WaitUntilDone();
-		if (!sumOutPipe->Remove(&sumRecBuffer)) {
-			cout << "Should have got data from the out pipe!" << endl;
-		}
-
-		/*
-		Attribute grpBy[] = {DA};
-		Schema grpsch("grp_sch", 1, grpBy);
-		sumRecBuffer.Print(&grpsch);
-		//cout << "******************" << endl;
-		*/
 
                 // inserting into pipe, consumes prev pointer
                 // and hence we can overwrite it now
-                wArgs->out->Insert(&sumRecBuffer);
 		delete prev;
 		prev = new Record;
                 prev->Copy(curr);
@@ -850,28 +826,20 @@ void* workerGroupBy (void *args) {
 
 		// start a new instance of sum now
 		delete sumInPipe;
-		delete sumOutPipe;
-
 		sumInPipe = new Pipe(100);
-		sumOutPipe = new Pipe(100);
 		sumRecBuffer.Copy(prev);
 		sumInPipe->Insert(&sumRecBuffer);
-		aggr.Run(*sumInPipe, *sumOutPipe, *(wArgs->func));
+		aggr.Run(*sumInPipe, *(wArgs->out), *(wArgs->func));
         }
 
 	// take care of the last record
 	sumInPipe->ShutDown();
 	aggr.WaitUntilDone();
-	if (!sumOutPipe->Remove(&sumRecBuffer)) {
-		cout << "Should have got data from the out pipe!" << endl;
-	}
 
 	// release everything
-	wArgs->out->Insert(&sumRecBuffer);
         delete prev;
         delete curr;
 	delete sumInPipe;
-	delete sumOutPipe;
 
         wArgs->out->ShutDown();
 }
