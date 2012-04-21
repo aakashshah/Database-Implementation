@@ -1,0 +1,42 @@
+4
+START
+c.n2.n1.s
+60000000
+c.c_custkey
+150000
+c.c_nationkey
+25
+n1.n_nationkey
+25
+n2.n_nationkey
+25
+s.s_nationkey
+25
+END
+START
+customer
+150000
+c_custkey
+150000
+c_nationkey
+25
+END
+START
+nation
+25
+n_nationkey
+25
+END
+START
+supplier
+10000
+s_nationkey
+25
+END
+6
+c n2
+c.n2 n1.s
+n1 s
+n1.s c.n2
+n2 c
+s n1

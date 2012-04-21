@@ -251,157 +251,53 @@ int GetRecAtts(Record &rec) {
 }
 
 void NestedLoopJoin(workerArgs *wArgs) {
-	// sort both relations
-	// dump the right relation while there is a match
-	// for it on the left relation
-	OrderMaker lOrder, rOrder;
 
-	int result = wArgs->cnf->GetSortOrders(lOrder, rOrder);
-
-	Pipe lOutPipe(100), rOutPipe(100);
-	BigQ lBigQ(*(wArgs->in), lOutPipe, lOrder, wArgs->runlen);
-	BigQ rBigQ(*(wArgs->inR), rOutPipe, rOrder, wArgs->runlen);
-
-	// compare the 1st record of both relations
-	// until left < right, skip left
-	// until left > right, skip right
-	// until left == right, dump right into a file
+	// first open the dbfile and dump the right relation into it,
+	// then join every record of the left relation, merge it with
+	// every record of the right relation and add it to the out pipe
+	Record recBuffer;
 	DBFile tmpFile;
 	char tmpFileName[MAX_FILENAME_LEN];
 	char metaFileName[MAX_FILENAME_LEN];
 	sprintf(tmpFileName, "%u%u.dump\0", (unsigned int)getpid(), (unsigned int)pthread_self());
 	sprintf(metaFileName, "%s.meta\0", tmpFileName);
-	Record *lRec = new Record, *rRec = new Record, *recBuffer = new Record;
-	ComparisonEngine cEng;
 
-	bool readLeft = false, readRight = false, dumpFileExists = false, skipCompare = true;
+	tmpFile.Create(tmpFileName, heap, NULL);
 
-	if (!lOutPipe.Remove(lRec)) {
-		wArgs->out->ShutDown();
-		return;
+	// keep the file ready
+	while (wArgs->inR->Remove(&recBuffer)) {
+		tmpFile.Add(recBuffer);
 	}
 
-	if (!rOutPipe.Remove(rRec)) {
-		wArgs->out->ShutDown();
-		return;
-	}
-
-	// get the configuration of left and right records
-	int lNumAtts = GetRecAtts(*lRec);
-	int rNumAtts = GetRecAtts(*rRec);
-	int attToKeep[lNumAtts+rNumAtts];
-	for (int i = 0; i < lNumAtts; i++) {
-		attToKeep[i] = i;
-	}
-	for (int i = 0; i < rNumAtts; i++) {
-		attToKeep[i+lNumAtts] = i;
-	}
-
-	while (true) {
-		// if need to read from left relalation
-		if (readLeft) {
-			if (!lOutPipe.Remove(lRec)) {
-				break;
-			}
-			readLeft = false;
-		}
-
-		// if need to read from right relation
-		if (readRight) {
-			if (!rOutPipe.Remove(rRec)) {
-				break;
-			}
-			readRight = false;
-		}
-
-		result = cEng.Compare(lRec, &lOrder, rRec, &rOrder);
-		if (result < 0) {
-			// left record is lagging behind
-			// first check if the dump file exists and compare
-			// the first record with the lRec, if a match, all
-			// records in the dump file should be merged with
-			// lRec otherwise, close and delete the dump file
-			Record rightRec;
-			if (dumpFileExists && !skipCompare) {
-				//cout << "here 0" << endl; 
-				tmpFile.MoveFirst();
-				//cout << "here 1" << endl;
-				tmpFile.GetNext(rightRec);
-				//cout << "here 2" << endl;
-				if (0 != cEng.Compare(lRec, &lOrder, &rightRec, &rOrder)) {
-					tmpFile.Close();
-					remove (tmpFileName);
-					remove (metaFileName);
-					dumpFileExists = false;
-				} else {
-					recBuffer->MergeRecords(lRec, &rightRec, lNumAtts, rNumAtts, attToKeep, (lNumAtts+rNumAtts), lNumAtts);
-					wArgs->out->Insert(recBuffer);
-					delete recBuffer;
-					recBuffer = new Record;
-					while (tmpFile.GetNext(rightRec)) {
-						recBuffer->MergeRecords(lRec, &rightRec, lNumAtts, rNumAtts, attToKeep, (lNumAtts+rNumAtts), lNumAtts);
-						wArgs->out->Insert(recBuffer);
-						delete recBuffer;
-						recBuffer = new Record;
-					}
+	// merge every record from the left relation with all atts in the file
+	Record pipeRec;
+	int lNumAtts = -1, rNumAtts, *attToKeep;
+	while (wArgs->in->Remove(&pipeRec)) {
+		tmpFile.MoveFirst();
+		Record fileRec;
+		while (tmpFile.GetNext(fileRec)) {
+			// get the configuration of left and right records
+			if (lNumAtts == -1) {
+				lNumAtts = GetRecAtts(pipeRec);
+				rNumAtts = GetRecAtts(fileRec);
+				attToKeep = new int[lNumAtts+rNumAtts];
+				for (int i = 0; i < lNumAtts; i++) {
+					attToKeep[i] = i;
+				}
+				for (int i = 0; i < rNumAtts; i++) {
+					attToKeep[i+lNumAtts] = i;
 				}
 			}
-			delete lRec;
-			lRec = new Record;
 
-			if (skipCompare) {
-				skipCompare = false;
-			}
-
-			readLeft = true;
-			continue;
-		}
-
-		if (result > 0) {
-			// right record is lagging behind
-			delete rRec;
-			rRec = new Record;
-			readRight = true;
-			continue;
-		}
-
-		if (result == 0) {
-			// records match! merge and dump into a file for future use
-			Record dumpThis;
-			dumpThis.Copy(rRec);
-			recBuffer->MergeRecords(lRec, rRec, lNumAtts, rNumAtts, attToKeep, (lNumAtts+rNumAtts), lNumAtts);
-			wArgs->out->Insert(recBuffer);
-
-			if (!dumpFileExists) {
-				//cout << "create..." << endl;
-				if (FALSE == tmpFile.Create(tmpFileName, heap, NULL)) {
-					cout << "Error creating dbfile!" << __FILE__ << __LINE__ << endl;
-					exit(1);
-				}
-				dumpFileExists = true;
-				// we do not want to merge the current record again
-				skipCompare = true;
-			}
-			//cout << "add..." << endl;
-			tmpFile.Add(dumpThis);
-			//cout << "added!" << endl;
-
-			delete recBuffer;
-			recBuffer = new Record;
-			readRight = true;
+			Record finalRec;
+			finalRec.MergeRecords(&pipeRec, &fileRec, lNumAtts, rNumAtts, attToKeep, (lNumAtts+rNumAtts), lNumAtts);
+			wArgs->out->Insert(&finalRec);
 		}
 	}
 
-	if (dumpFileExists) {
-		tmpFile.Close();
-		remove (tmpFileName);
-		remove (metaFileName);
-		dumpFileExists = false;
-	}
-
-	delete lRec;
-	delete rRec;
-	delete recBuffer;
+	tmpFile.Close();
+	remove (tmpFileName);
+	remove (metaFileName);
 
 	wArgs->out->ShutDown();
 }
